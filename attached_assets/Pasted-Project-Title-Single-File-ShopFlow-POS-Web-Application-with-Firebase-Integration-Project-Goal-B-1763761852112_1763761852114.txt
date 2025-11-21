@@ -1,0 +1,149 @@
+Project Title: Single-File "ShopFlow" POS Web Application with Firebase Integration
+
+Project Goal: Build a complete, modern, and professional landing and web application for a Point-of-Sale (POS) system called "ShopFlow." The entire application (HTML, CSS, and JavaScript) must be contained within a single index.html file. No build tools (like Webpack/Vite) or external local CSS/JS files are allowed.
+
+Core Technology Stack:
+
+Structure: Single index.html file.
+
+Styling: Tailwind CSS (via CDN).
+
+Logic: Modern Vanilla JavaScript (ES6+).
+
+Backend: Firebase (Authentication & Firestore) via CDN.
+
+Firebase & Data Architecture (CRITICAL) Initialization:
+Use the following global variables for setup (assume these are injected by the host environment): __app_id, __firebase_config, and __initial_auth_token.
+
+Auth Flow: Attempt to sign in using signInWithCustomToken using __initial_auth_token. If undefined, fallback to signInAnonymously.
+
+Standard Auth: Implement UI for Email/Password and Google Sign-In.
+
+Firestore Storage Paths (Strict Adherence Required):
+
+Reviews (Public): Store in /artifacts/{__app_id}/public/data/shopflow_reviews/{documentId}.
+
+User Licenses (Private/Admin): Store in /artifacts/{__app_id}/users/{userId}/shopflow_licenses/{documentId}.
+
+User Profiles: Store in users/{userId} (contains email, role, createdAt).
+
+Real-time Logic:
+
+Use onSnapshot for fetching Reviews and Admin License data to ensure the UI updates instantly without refreshing.
+
+Design & UX Guidelines Aesthetics: Clean, trustworthy SaaS look. Professional Blue (#3b82f6) or Modern Green (#10b981) primary colors. High contrast, plenty of whitespace.
+Animations: Implement subtle transitions (fade-ins on scroll, hover effects on buttons/cards) to make the single-file app feel like a premium product.
+
+Responsiveness: Fully responsive design. The Navbar must collapse into a hamburger menu on mobile.
+
+Functional Modules & Sections The application must simulate a Multi-Page Application (SPA) using JavaScript to show/hide sections based on navigation.
+A. Global Navigation (Navbar)
+Left: "ShopFlow" Logo.
+
+Right: Links for Home, Pricing, Reviews, About Us, Contact.
+
+Auth State Logic:
+
+Logged Out: Show "Login" and "Sign Up" buttons.
+
+Logged In: Show "Dashboard" link and "Logout" button.
+
+Admin User: Show "Admin Panel" link.
+
+B. Home Section (Landing)
+Hero: Headline ("The POS System That Grows with Your Business"), Sub-headline, and "Get Started" button (links to Sign Up).
+
+Features: 3-column grid (Easy Inventory, Fast Checkout, Sales Analytics) with icons.
+
+Testimonials: Visual placeholders for 3 customer reviews.
+
+Final CTA: Strong invitation to sign up.
+
+C. Pricing Section (Indian Market Focus)
+Currency: All prices in INR (₹).
+
+Tax Disclaimer: Must state "Inclusive of all taxes" next to prices.
+
+Tiers:
+
+Small Business: Up to 3 user accounts, Support replies in 2 days.
+
+Enterprise: Unlimited users, Priority Support (1-day reply).
+
+Note: NO Free tier displayed.
+
+CTA: "Try now for 14-days" (prominent button).
+
+D. Reviews Section (Conditional Access)
+Access Rule: Visible ONLY to logged-in users with a valid (active/paid) license found in the Firestore License path.
+
+Submission Form:
+
+Star Rating: Interactive 5-star input (stars turn yellow on selection).
+
+Comment: Text area.
+
+Logic: Saves userId, rating (1-5), and comment to Firestore.
+
+Display Feed:
+
+Real-time list of reviews.
+
+Filters: Tabs for 5 Stars, 4 Stars, etc. Default view: Descending by star count, then date.
+
+E. Admin Panel (Restricted)
+Access Rule: Accessible only to the specific Admin user (assume the first user or hardcode a specific Admin ID).
+
+License Management (Functional):
+
+Table displaying all registered users.
+
+Actions:
+
+View Status: (e.g., 'None', 'Small Business', 'Trial').
+
+Modify License: Dropdown to assign 'Small Business' or 'Enterprise'.
+
+Set Expiry: Date picker input.
+
+Revoke: Button to remove license.
+
+Data Sync: Updates must persist to the specific Firestore License path.
+
+F. About Us
+Company Name: Ayudak.
+
+Motive: "To provide the best apps with affordable pricing and crazy features."
+
+App Motive: "Built for small business owners."
+
+Dev Team: Subheading "About the Developers" with links:
+
+ayushcodeui.netlify.app
+
+dakshbackend.netlify.app
+
+G. Contact Us
+Form: Name, Email, Message (UI only).
+
+Contact Info:
+
+Email: devbydaksh@gmail.com
+
+Phones: +91 82188 97129, +91 97201 77772
+
+H. Legal Pages (Modals or Sections)
+Privacy Policy: Standard SaaS text.
+
+Terms of Service: Standard SaaS text.
+
+Integration: A Checkbox "I agree to Privacy Policies" is mandatory before any mock payment/signup process can proceed.
+
+I. User Dashboard (Protected)
+Display User Email.
+
+Display Current License Status (fetched from Firestore).
+
+Option to Change Password.
+
+Deliverable: One single, formatted index.html file containing the HTML structure, Tailwind classes, and the <script> block handling all Firebase logic, routing, state management, and UI interactions.v
