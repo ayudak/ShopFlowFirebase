@@ -1,5 +1,6 @@
-// Firebase configuration types and initialization
-// Note: Firebase will be initialized at runtime using CDN and global variables
+import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
+import { getAuth, Auth } from 'firebase/auth';
+import { getFirestore, Firestore } from 'firebase/firestore';
 
 export interface FirebaseConfig {
   apiKey: string;
@@ -10,7 +11,6 @@ export interface FirebaseConfig {
   appId: string;
 }
 
-// Global variables injected by host environment
 declare global {
   interface Window {
     __app_id?: string;
@@ -31,8 +31,46 @@ export const getInitialAuthToken = (): string | undefined => {
   return window.__initial_auth_token;
 };
 
-// Firestore paths helper
-export const getFirestorePaths = (userId?: string) => {
+let firebaseApp: FirebaseApp | null = null;
+let auth: Auth | null = null;
+let db: Firestore | null = null;
+
+export const initializeFirebase = (): { app: FirebaseApp; auth: Auth; db: Firestore } | null => {
+  if (firebaseApp && auth && db) {
+    return { app: firebaseApp, auth, db };
+  }
+
+  const config = getFirebaseConfig();
+  if (!config) {
+    console.warn('Firebase config not found. Using mock mode.');
+    return null;
+  }
+
+  try {
+    if (getApps().length === 0) {
+      firebaseApp = initializeApp(config);
+    } else {
+      firebaseApp = getApps()[0];
+    }
+
+    auth = getAuth(firebaseApp);
+    db = getFirestore(firebaseApp);
+
+    return { app: firebaseApp, auth, db };
+  } catch (error) {
+    console.error('Failed to initialize Firebase:', error);
+    return null;
+  }
+};
+
+export const getFirebaseInstances = () => {
+  if (!firebaseApp || !auth || !db) {
+    return initializeFirebase();
+  }
+  return { app: firebaseApp, auth, db };
+};
+
+export const getFirestorePaths = () => {
   const appId = getAppId();
   return {
     reviews: `artifacts/${appId}/public/data/shopflow_reviews`,
