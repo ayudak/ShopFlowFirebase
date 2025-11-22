@@ -1,34 +1,16 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
+import { getAnalytics } from 'firebase/analytics';
 
-export interface FirebaseConfig {
-  apiKey: string;
-  authDomain: string;
-  projectId: string;
-  storageBucket: string;
-  messagingSenderId: string;
-  appId: string;
-}
-
-declare global {
-  interface Window {
-    __app_id?: string;
-    __firebase_config?: FirebaseConfig;
-    __initial_auth_token?: string;
-  }
-}
-
-export const getAppId = (): string => {
-  return window.__app_id || 'default-app-id';
-};
-
-export const getFirebaseConfig = (): FirebaseConfig | null => {
-  return window.__firebase_config || null;
-};
-
-export const getInitialAuthToken = (): string | undefined => {
-  return window.__initial_auth_token;
+const firebaseConfig = {
+  apiKey: "AIzaSyCAFtpwq9zf5w0LUlSECsOjDwoR_j-CKRE",
+  authDomain: "shopflow-firebase.firebaseapp.com",
+  projectId: "shopflow-firebase",
+  storageBucket: "shopflow-firebase.firebasestorage.app",
+  messagingSenderId: "1001235189204",
+  appId: "1:1001235189204:web:aa9a205598fd1e8f939a41",
+  measurementId: "G-R05MDSPWSH"
 };
 
 let firebaseApp: FirebaseApp | null = null;
@@ -40,21 +22,19 @@ export const initializeFirebase = (): { app: FirebaseApp; auth: Auth; db: Firest
     return { app: firebaseApp, auth, db };
   }
 
-  const config = getFirebaseConfig();
-  if (!config) {
-    console.warn('Firebase config not found. Using mock mode.');
-    return null;
-  }
-
   try {
     if (getApps().length === 0) {
-      firebaseApp = initializeApp(config);
+      firebaseApp = initializeApp(firebaseConfig);
     } else {
       firebaseApp = getApps()[0];
     }
 
     auth = getAuth(firebaseApp);
     db = getFirestore(firebaseApp);
+    
+    if (typeof window !== 'undefined') {
+      getAnalytics(firebaseApp);
+    }
 
     return { app: firebaseApp, auth, db };
   } catch (error) {
@@ -71,11 +51,10 @@ export const getFirebaseInstances = () => {
 };
 
 export const getFirestorePaths = () => {
-  const appId = getAppId();
   return {
-    reviews: `artifacts/${appId}/public/data/shopflow_reviews`,
-    userLicenses: (uid: string) => `artifacts/${appId}/users/${uid}/shopflow_licenses`,
+    reviews: 'shopflow_reviews',
+    userLicenses: (uid: string) => `users/${uid}/licenses`,
     userProfile: (uid: string) => `users/${uid}`,
-    contactMessages: `artifacts/${appId}/public/data/shopflow_contact_messages`,
+    contactMessages: 'contact_messages',
   };
 };
