@@ -76,5 +76,6 @@ export const getFirestorePaths = () => {
     reviews: `artifacts/${appId}/public/data/shopflow_reviews`,
     userLicenses: (uid: string) => `artifacts/${appId}/users/${uid}/shopflow_licenses`,
     userProfile: (uid: string) => `users/${uid}`,
+    contactMessages: `artifacts/${appId}/public/data/shopflow_contact_messages`,
   };
 };

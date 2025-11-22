@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -10,75 +10,145 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Shield, Calendar, Trash2 } from 'lucide-react';
+import { Shield, Calendar, Trash2, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Link } from 'wouter';
 import type { LicenseType } from '@shared/schema';
+import { FirebaseService } from '@/lib/firebaseService';
+import { queryClient } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
+
+interface UserWithLicense {
+  id: string;
+  email: string;
+  license: LicenseType;
+  licenseId?: string;
+  expiryDate?: string;
+  isActive: boolean;
+}
 
 export default function AdminPanel() {
   const { isAdmin } = useAuth();
+  const { toast } = useToast();
 
-  // Mock users data (will be replaced with Firestore in Task 2)
-  const [users, setUsers] = useState([
-    {
-      id: '1',
-      email: 'rajesh@example.com',
-      license: 'Small Business' as LicenseType,
-      expiryDate: '2025-12-31',
-      isActive: true,
-    },
-    {
-      id: '2',
-      email: 'priya@example.com',
-      license: 'Enterprise' as LicenseType,
-      expiryDate: '2025-11-30',
-      isActive: true,
-    },
-    {
-      id: '3',
-      email: 'amit@example.com',
-      license: 'Trial' as LicenseType,
-      expiryDate: '2025-02-15',
-      isActive: true,
-    },
-    {
-      id: '4',
-      email: 'test@example.com',
-      license: 'None' as LicenseType,
-      expiryDate: undefined,
-      isActive: false,
-    },
-  ]);
+  const { data: usersData = [], isLoading } = useQuery({
+    queryKey: ['/api/admin/users'],
+    queryFn: async () => {
+      try {
+        const [users, userLicenses] = await Promise.all([
+          FirebaseService.getAllUsers(),
+          FirebaseService.getAllUserLicenses(),
+        ]);
 
-  const updateLicense = (userId: string, newLicense: LicenseType) => {
-    // Will be implemented with Firestore in Task 2
-    setUsers(users.map(u => u.id === userId ? { ...u, license: newLicense, isActive: newLicense !== 'None' } : u));
-    console.log('Updating license for user:', userId, newLicense);
+        const usersWithLicenses: UserWithLicense[] = users.map((user) => {
+          const userLicenseData = userLicenses.find((ul) => ul.userId === user.id);
+          const activeLicense = userLicenseData?.licenses.find((l) => l.isActive);
+          const license = activeLicense || userLicenseData?.licenses[0];
+
+          return {
+            id: user.id,
+            email: user.email,
+            license: license?.type || 'None',
+            licenseId: license?.id,
+            expiryDate: license?.expiryDate,
+            isActive: license?.isActive || false,
+          };
+        });
+
+        return usersWithLicenses;
+      } catch (error) {
+        console.error('Failed to fetch users:', error);
+        return [];
+      }
+    },
+  });
+
+  const updateLicenseMutation = useMutation({
+    mutationFn: async ({ userId, licenseId, newLicense }: { userId: string; licenseId?: string; newLicense: LicenseType }) => {
+      if (licenseId) {
+        await FirebaseService.updateLicense(userId, licenseId, {
+          type: newLicense,
+          isActive: newLicense !== 'None',
+        });
+      } else {
+        await FirebaseService.createLicense(userId, {
+          type: newLicense,
+          isActive: newLicense !== 'None',
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      toast({
+        title: 'License Updated',
+        description: 'User license has been updated successfully',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Update Failed',
+        description: error.message || 'Failed to update license',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const updateExpiryMutation = useMutation({
+    mutationFn: async ({ userId, licenseId, newDate }: { userId: string; licenseId: string; newDate: string }) => {
+      await FirebaseService.updateLicense(userId, licenseId, {
+        expiryDate: newDate,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      toast({
+        title: 'Expiry Updated',
+        description: 'License expiry date has been updated',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Update Failed',
+        description: error.message || 'Failed to update expiry date',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const revokeLicenseMutation = useMutation({
+    mutationFn: async ({ userId, licenseId }: { userId: string; licenseId: string }) => {
+      await FirebaseService.updateLicense(userId, licenseId, {
+        type: 'None',
+        isActive: false,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      toast({
+        title: 'License Revoked',
+        description: 'User license has been revoked',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Revoke Failed',
+        description: error.message || 'Failed to revoke license',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const updateLicense = (userId: string, licenseId: string | undefined, newLicense: LicenseType) => {
+    updateLicenseMutation.mutate({ userId, licenseId, newLicense });
   };
 
-  const updateExpiry = (userId: string, newDate: string) => {
-    // Will be implemented with Firestore in Task 2
-    setUsers(users.map(u => u.id === userId ? { ...u, expiryDate: newDate } : u));
-    console.log('Updating expiry for user:', userId, newDate);
+  const updateExpiry = (userId: string, licenseId: string | undefined, newDate: string) => {
+    if (!licenseId) return;
+    updateExpiryMutation.mutate({ userId, licenseId, newDate });
   };
 
-  const revokeLicense = (userId: string) => {
-    // Will be implemented with Firestore in Task 2
-    setUsers(users.map(u => u.id === userId ? { ...u, license: 'None', isActive: false } : u));
-    console.log('Revoking license for user:', userId);
-  };
-
-  const getLicenseBadgeVariant = (license: LicenseType) => {
-    switch (license) {
-      case 'Enterprise':
-        return 'default';
-      case 'Small Business':
-        return 'secondary';
-      case 'Trial':
-        return 'outline';
-      default:
-        return 'destructive';
-    }
+  const revokeLicense = (userId: string, licenseId: string | undefined) => {
+    if (!licenseId) return;
+    revokeLicenseMutation.mutate({ userId, licenseId });
   };
 
   if (!isAdmin) {
@@ -91,11 +161,19 @@ export default function AdminPanel() {
             <p className="text-lg text-muted-foreground">
               This section is only accessible to administrators.
             </p>
-            <Link href="/">
-              <Button data-testid="button-go-home">Go to Home</Button>
-            </Link>
+            <Button onClick={() => window.location.href = '/'} data-testid="button-go-home">
+              Go to Home
+            </Button>
           </Card>
         </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -103,7 +181,6 @@ export default function AdminPanel() {
   return (
     <div className="min-h-screen py-16 md:py-24">
       <div className="max-w-7xl mx-auto px-6 md:px-8 space-y-8">
-        {/* Header */}
         <div className="space-y-2">
           <div className="flex items-center gap-3">
             <Shield className="w-8 h-8 text-primary" />
@@ -114,7 +191,6 @@ export default function AdminPanel() {
           </p>
         </div>
 
-        {/* Users Table */}
         <Card>
           <div className="overflow-x-auto">
             <table className="w-full" data-testid="table-users">
@@ -128,91 +204,98 @@ export default function AdminPanel() {
                 </tr>
               </thead>
               <tbody>
-                {users.map((user, index) => (
-                  <tr
-                    key={user.id}
-                    className={`border-b last:border-0 ${index % 2 === 0 ? 'bg-muted/30' : ''}`}
-                    data-testid={`row-user-${user.id}`}
-                  >
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                          <span className="text-sm font-medium text-primary">
-                            {user.email.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                        <span className="font-medium">{user.email}</span>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <Badge variant={user.isActive ? 'default' : 'destructive'}>
-                        {user.isActive ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </td>
-                    <td className="p-4">
-                      <Select
-                        value={user.license}
-                        onValueChange={(value) => updateLicense(user.id, value as LicenseType)}
-                      >
-                        <SelectTrigger className="w-[180px]" data-testid={`select-license-${user.id}`}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent data-testid={`select-content-license-${user.id}`}>
-                          <SelectItem value="None" data-testid={`select-item-none-${user.id}`}>None</SelectItem>
-                          <SelectItem value="Trial" data-testid={`select-item-trial-${user.id}`}>Trial</SelectItem>
-                          <SelectItem value="Small Business" data-testid={`select-item-small-business-${user.id}`}>Small Business</SelectItem>
-                          <SelectItem value="Enterprise" data-testid={`select-item-enterprise-${user.id}`}>Enterprise</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-muted-foreground" />
-                        <Input
-                          type="date"
-                          value={user.expiryDate || ''}
-                          onChange={(e) => updateExpiry(user.id, e.target.value)}
-                          className="w-[160px]"
-                          disabled={user.license === 'None'}
-                          data-testid={`input-expiry-${user.id}`}
-                        />
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => revokeLicense(user.id)}
-                        disabled={user.license === 'None'}
-                        data-testid={`button-revoke-${user.id}`}
-                      >
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
+                {usersData.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                      No users found
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  usersData.map((user, index) => (
+                    <tr
+                      key={user.id}
+                      className={`border-b last:border-0 ${index % 2 === 0 ? 'bg-muted/30' : ''}`}
+                      data-testid={`row-user-${user.id}`}
+                    >
+                      <td className="p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-sm font-medium text-primary">
+                              {user.email.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <span className="font-medium">{user.email}</span>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <Badge variant={user.isActive ? 'default' : 'destructive'}>
+                          {user.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </td>
+                      <td className="p-4">
+                        <Select
+                          value={user.license}
+                          onValueChange={(value) => updateLicense(user.id, user.licenseId, value as LicenseType)}
+                        >
+                          <SelectTrigger className="w-[180px]" data-testid={`select-license-${user.id}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent data-testid={`select-content-license-${user.id}`}>
+                            <SelectItem value="None" data-testid={`select-item-none-${user.id}`}>None</SelectItem>
+                            <SelectItem value="Trial" data-testid={`select-item-trial-${user.id}`}>Trial</SelectItem>
+                            <SelectItem value="Small Business" data-testid={`select-item-small-business-${user.id}`}>Small Business</SelectItem>
+                            <SelectItem value="Enterprise" data-testid={`select-item-enterprise-${user.id}`}>Enterprise</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-muted-foreground" />
+                          <Input
+                            type="date"
+                            value={user.expiryDate || ''}
+                            onChange={(e) => updateExpiry(user.id, user.licenseId, e.target.value)}
+                            className="w-[160px]"
+                            disabled={user.license === 'None'}
+                            data-testid={`input-expiry-${user.id}`}
+                          />
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => revokeLicense(user.id, user.licenseId)}
+                          disabled={user.license === 'None'}
+                          data-testid={`button-revoke-${user.id}`}
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         </Card>
 
-        {/* Stats Summary */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card className="p-6">
             <p className="text-sm text-muted-foreground mb-1">Total Users</p>
-            <p className="text-3xl font-bold">{users.length}</p>
+            <p className="text-3xl font-bold">{usersData.length}</p>
           </Card>
           <Card className="p-6">
             <p className="text-sm text-muted-foreground mb-1">Active Licenses</p>
-            <p className="text-3xl font-bold">{users.filter(u => u.isActive).length}</p>
+            <p className="text-3xl font-bold">{usersData.filter(u => u.isActive).length}</p>
           </Card>
           <Card className="p-6">
             <p className="text-sm text-muted-foreground mb-1">Enterprise Plans</p>
-            <p className="text-3xl font-bold">{users.filter(u => u.license === 'Enterprise').length}</p>
+            <p className="text-3xl font-bold">{usersData.filter(u => u.license === 'Enterprise').length}</p>
           </Card>
           <Card className="p-6">
             <p className="text-sm text-muted-foreground mb-1">Trial Users</p>
-            <p className="text-3xl font-bold">{users.filter(u => u.license === 'Trial').length}</p>
+            <p className="text-3xl font-bold">{usersData.filter(u => u.license === 'Trial').length}</p>
           </Card>
         </div>
       </div>

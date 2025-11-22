@@ -30,6 +30,14 @@ export const reviews = pgTable("reviews", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const contactMessages = pgTable("contact_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Insert Schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -43,6 +51,11 @@ export const insertLicenseSchema = createInsertSchema(licenses).omit({
 });
 
 export const insertReviewSchema = createInsertSchema(reviews).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertContactMessageSchema = createInsertSchema(contactMessages).omit({
   id: true,
   createdAt: true,
 });
@@ -84,6 +97,15 @@ export const firebaseReviewSchema = z.object({
 export type FirebaseUserProfile = z.infer<typeof firebaseUserProfileSchema>;
 export type FirebaseLicense = z.infer<typeof firebaseLicenseSchema>;
 export type FirebaseReview = z.infer<typeof firebaseReviewSchema>;
+
+export const firebaseContactMessageSchema = z.object({
+  name: z.string(),
+  email: z.string().email(),
+  message: z.string(),
+  createdAt: z.string(),
+});
+
+export type FirebaseContactMessage = z.infer<typeof firebaseContactMessageSchema>;
 
 // License type enum
 export const licenseTypeSchema = z.enum(['Small Business', 'Enterprise', 'Trial', 'None']);
