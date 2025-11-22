@@ -19,7 +19,6 @@ import {
   initializeFirebase,
   getFirebaseInstances,
   getFirestorePaths,
-  getInitialAuthToken,
 } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 
@@ -129,16 +128,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     const tryCustomTokenAuth = async () => {
-      const customToken = getInitialAuthToken();
-      if (customToken) {
-        try {
-          await signInWithCustomToken(auth, customToken);
-          return;
-        } catch (error) {
-          console.error('Custom token auth failed, falling back to anonymous:', error);
-        }
-      }
-      
       try {
         await signInAnonymously(auth);
       } catch (anonError) {
